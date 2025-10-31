@@ -1,0 +1,69 @@
+#=====================================================================
+# CONFIGURACIÓN DE SEGURIDAD Y CONTROL DE ACCESO - MyBox
+#=====================================================================
+
+#---------------------------------------------------------------------
+# Impide navegar por los directorios del sitio
+#---------------------------------------------------------------------
+Options All -Indexes
+
+#---------------------------------------------------------------------
+# Páginas de error personalizadas
+#---------------------------------------------------------------------
+ErrorDocument 400 http://localhost:8080/2025/mybox/errores/400.php
+ErrorDocument 401 http://localhost:8080/2025/mybox/errores/403.php
+ErrorDocument 403 http://localhost:8080/2025/mybox/errores/403.php
+ErrorDocument 404 http://localhost:8080/2025/mybox/errores/404.php
+ErrorDocument 500 http://localhost:8080/2025/mybox/errores/500.php
+
+#---------------------------------------------------------------------
+# Bloquea acceso a archivos con extensiones sensibles
+#---------------------------------------------------------------------
+<FilesMatch "(\.(bak|config|inc|ini|log|sh|sql)|~)$">
+    Require all denied
+</FilesMatch>
+
+#---------------------------------------------------------------------
+# Bloquea el acceso directo a archivos .htaccess o similares
+#---------------------------------------------------------------------
+<Files ".ht*">
+    Require all denied
+</Files>
+
+#---------------------------------------------------------------------
+# Variables de entorno necesarias para MyBox
+#---------------------------------------------------------------------
+# Estas se usan en los scripts PHP (conexion.inc, carpetas.php, etc.)
+# para determinar rutas y credenciales del sistema.
+SetEnv HOME_PATH "/home/myboxusers"
+SetEnv DB_USER "myboxuser"
+SetEnv DB_PASS "MyBoxSecure123!"
+
+#---------------------------------------------------------------------
+# Límite máximo de tamaño para archivos cargados
+#---------------------------------------------------------------------
+php_value upload_max_filesize 20M
+php_value post_max_size 20M
+
+#---------------------------------------------------------------------
+# Limita el acceso solo a las tres terminales del laboratorio
+# (reemplaza las IPs por las reales de tu entorno)
+#---------------------------------------------------------------------
+<RequireAll>
+    Require ip 10.90.28.81
+    Require ip 100.90.154.125
+    Require ip 10.90.28.90
+</RequireAll>
+
+#---------------------------------------------------------------------
+# Opcional: redirección forzada a HTTPS
+# (activar quitando los "#")
+#---------------------------------------------------------------------
+#RewriteEngine on
+#RewriteCond %{HTTPS} !on
+#RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI}
+
+#---------------------------------------------------------------------
+# Fin de configuración .htaccess
+#---------------------------------------------------------------------
+
