@@ -1,4 +1,7 @@
 <?php
+// =========================================================
+// index.php - Página de login
+// =========================================================
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -10,17 +13,18 @@ $Accion_Formulario = $_SERVER['PHP_SELF'];
 
 if (isset($_POST['txtUsua']) && isset($_POST['txtContra'])) {
 
-    $usuario = $_POST['txtUsua'];
-    $contra = $_POST['txtContra'];
+    $usuario = trim($_POST['txtUsua']);
+    $contra = trim($_POST['txtContra']);
 
-    // Aplica el mismo hash que usas al registrar
+    // Aplica el mismo hash SHA256
     $hash = hash("sha256", $contra);
 
-    // Busca usuario con contraseña en hash
+    // Busca usuario con contraseña hasheada
     $auxSql = sprintf(
-        "SELECT nombre, usuario FROM usuarios 
+        "SELECT id, nombre, usuario, email FROM usuarios 
          WHERE usuario='%s' AND contra='%s'",
-        $usuario, $hash
+        mysqli_real_escape_string($conex, $usuario), 
+        $hash
     );
 
     $regis = mysqli_query($conex, $auxSql);
@@ -34,9 +38,12 @@ if (isset($_POST['txtUsua']) && isset($_POST['txtContra'])) {
 
         // Usuario válido, crea sesión
         $_SESSION["autenticado"] = "SI";
+        $_SESSION["usuario_id"] = $tupla['id'];
         $_SESSION["nombre"] = $tupla['nombre'];
         $_SESSION["usuario"] = $tupla['usuario'];
+        $_SESSION["email"] = $tupla['email'];
 
+        // Redirigir a carpetas
         header("Location: carpetas.php");
         exit();
     } else {
@@ -50,7 +57,7 @@ if (isset($_POST['txtUsua']) && isset($_POST['txtContra'])) {
 <html>
 <head>
     <?php include_once('partes/encabe.inc'); ?>
-    <title>Ingreso al Sitio</title>
+    <title>MyBox - Ingreso</title>
 </head>
 <body class="container cuerpo">
     <header class="row">
@@ -68,22 +75,22 @@ if (isset($_POST['txtUsua']) && isset($_POST['txtContra'])) {
     <main class="row">
         <div class="panel panel-primary logueo">
             <div class="panel-heading">
-                <strong>Autentificación</strong>  
+                <strong>🔐 Autentificación MyBox</strong>  
             </div>
             <div class="panel-body">
                 <form action="<?php echo $Accion_Formulario; ?>" method="post">
                     <fieldset>
                         <label>Usuario:</label>
                         <input type="text" name="txtUsua" size="22" maxlength="15" required /><br>                    
-                        <label>Contrase&ntilde;a:</label>
+                        <label>Contraseña:</label>
                         <input type="password" name="txtContra" size="22" maxlength="15" required />
                     </fieldset>
-                    <input type="submit" value="Aceptar" />
+                    <input type="submit" value="Ingresar" class="btn btn-primary" />
                 </form>
+                <br>
+                <p>¿No tienes cuenta? <a href="registrar.php">Regístrate aquí</a></p>
             </div>                                
-        </div>   
-        <br>
-        <a href="registrar.php">Registrarse Aquí</a>            
+        </div>            
     </main>
             
     <footer class="row">
@@ -91,4 +98,3 @@ if (isset($_POST['txtUsua']) && isset($_POST['txtContra'])) {
     <?php include_once('partes/final.inc'); ?>        
 </body>
 </html>
-
