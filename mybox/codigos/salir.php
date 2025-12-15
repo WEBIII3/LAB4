@@ -1,14 +1,24 @@
 <?php
-	header ("Cache-Control: no-cache, must-revalidate");
-	header ("Pragma: no-cache");
+// =========================================================
+// codigos/salir.php - Cerrar sesión
+// =========================================================
 
-	session_start();
-		unset($_SESSION['autenticado']);
-		unset($_SESSION['usuario']);
-		unset($_SESSION['nombre']);
-		unset($_SESSION['email']);
-	session_destroy();
-		
-	header("Location: ../index.php");
-    exit();
+header("Cache-Control: no-cache, must-revalidate");
+header("Pragma: no-cache");
+
+session_start();
+
+// Destruir todas las variables de sesión
+unset($_SESSION['autenticado']);
+unset($_SESSION['usuario_id']);
+unset($_SESSION['usuario']);
+unset($_SESSION['nombre']);
+unset($_SESSION['email']);
+
+// Destruir la sesión completamente
+session_destroy();
+
+// Redirigir al login
+header("Location: ../index.php");
+exit();
 ?>

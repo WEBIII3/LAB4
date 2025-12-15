@@ -1,4 +1,8 @@
 <?php
+// =========================================================
+// abrArchi.php - Descargar/visualizar archivos desde BD
+// =========================================================
+
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 session_start();
@@ -9,64 +13,100 @@ if (!isset($_SESSION["autenticado"]) || $_SESSION["autenticado"] != "SI") {
     exit();
 }
 
-$ruta_base = getenv("HOME_PATH") ?: "/home/myboxusers";
-$usuario_actual = $_SESSION["usuario"];
-$archivo_relativo = isset($_GET['dir']) ? trim($_GET['dir'], '/') : '';
-$propietario = isset($_GET['shared']) ? basename($_GET['shared']) : $usuario_actual;
+include_once('codigos/conexion.inc');
 
-// Valida parámetros mínimos
-if ($archivo_relativo === '') {
-    die("<p style='color:red;'>❌ No se especificó ningún archivo.</p>");
+$usuario_nombre = $_SESSION["usuario"];
+$archivo_id = isset($_GET['archivo_id']) ? (int)$_GET['archivo_id'] : 0;
+$es_compartido = isset($_GET['shared']);
+
+if ($archivo_id <= 0) {
+    die("<p style='color:red;'>❌ ID de archivo no válido.</p>");
 }
 
-// Si es un archivo compartido, validar permisos
-if (isset($_GET['shared'])) {
-    include_once('codigos/conexion.inc');
+// Obtener ID del usuario actual
+$stmt = $conn->prepare("SELECT id FROM usuarios WHERE usuario = ?");
+$stmt->execute([$usuario_nombre]);
+$usuario_id = $stmt->fetchColumn();
+
+// ============================================
+// 1️⃣ Obtener información del archivo
+// ============================================
+$stmt = $conn->prepare("
+    SELECT 
+        a.id, 
+        a.usuario_id, 
+        a.nombre, 
+        a.nombre_original, 
+        a.extension, 
+        a.mime_type, 
+        a.tamano, 
+        a.contenido,
+        u.usuario AS propietario
+    FROM archivos a
+    INNER JOIN usuarios u ON a.usuario_id = u.id
+    WHERE a.id = ?
+");
+$stmt->execute([$archivo_id]);
+$archivo = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$archivo) {
+    die("<p style='color:red;'>❌ Archivo no encontrado.</p>");
+}
+
+// ============================================
+// 2️⃣ Validar permisos
+// ============================================
+$tiene_permiso = false;
+
+// Caso 1: Es el propietario
+if ($archivo['usuario_id'] == $usuario_id) {
+    $tiene_permiso = true;
+}
+
+// Caso 2: Archivo compartido con el usuario
+if (!$tiene_permiso) {
     $stmt = $conn->prepare("
         SELECT 1 FROM compartidos 
-        WHERE propietario = ? 
-        AND ruta = ? 
-        AND compartido_con = ?
+        WHERE archivo_id = ? 
+        AND compartido_con_id = ? 
+        AND tipo = 'archivo'
     ");
-    $stmt->execute([$propietario, $archivo_relativo, $usuario_actual]);
-    $permitido = $stmt->fetchColumn();
-    if (!$permitido) {
-        die("<p style='color:red;'>❌ No tienes permiso para acceder a este recurso compartido.</p>");
+    $stmt->execute([$archivo_id, $usuario_id]);
+    if ($stmt->fetchColumn()) {
+        $tiene_permiso = true;
     }
 }
 
-// Ruta absoluta final
-$ruta_usuario = "$ruta_base/$propietario";
-$ruta = realpath("$ruta_usuario/$archivo_relativo");
-
-// Validaciones
-if (!$ruta || !file_exists($ruta) || strpos($ruta, $ruta_usuario) !== 0) {
-    die("<p style='color:red;'>❌ Acceso no autorizado o archivo inexistente.</p>");
+if (!$tiene_permiso) {
+    die("<p style='color:red;'>❌ No tienes permiso para acceder a este archivo.</p>");
 }
 
-// Si el archivo es en realidad una carpeta → redirigir a carpetas.php
-if (is_dir($ruta)) {
-    header("Location: carpetas.php?shared=" . urlencode($propietario) . "&dir=" . urlencode($archivo_relativo));
-    exit();
+// ============================================
+// 3️⃣ Servir el archivo
+// ============================================
+
+// Limpiar cualquier salida previa
+ob_clean();
+flush();
+
+$extension = strtolower($archivo['extension']);
+$mime_type = $archivo['mime_type'];
+
+// Determinar si se debe mostrar inline (en navegador) o forzar descarga
+$mostrar_inline = in_array($extension, ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'txt', 'html', 'css', 'js']);
+
+if ($mostrar_inline) {
+    header("Content-Disposition: inline; filename=\"" . $archivo['nombre_original'] . "\"");
+} else {
+    header("Content-Disposition: attachment; filename=\"" . $archivo['nombre_original'] . "\"");
 }
 
-// Obtiene tipo MIME
-$mime = mime_content_type($ruta);
-$ext = strtolower(pathinfo($ruta, PATHINFO_EXTENSION));
+header("Content-Type: " . $mime_type);
+header("Content-Length: " . $archivo['tamano']);
+header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+header("Pragma: public");
 
-// Visualizar imágenes o PDF
-if (in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'gif'])) {
-    header("Content-Type: $mime");
-    header("Content-Length: " . filesize($ruta));
-    readfile($ruta);
-    exit();
-}
-
-// Forzar descarga
-header("Content-Disposition: attachment; filename=\"" . basename($ruta) . "\"");
-header("Content-Type: $mime");
-header("Content-Length: " . filesize($ruta));
-readfile($ruta);
+// Enviar el contenido del archivo
+echo $archivo['contenido'];
 exit();
 ?>
-
